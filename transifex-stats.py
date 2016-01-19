@@ -137,9 +137,14 @@ class TransifexStats(object):
             else:
                 return 0
         user_names = sorted(users, comparator)
-        print('Top:')
-        for user in user_names[:20]:
-            print('%20s: %d translations, %s last update' % (user, users[user]['count'], users[user]['last_update']))
+        amount = 50
+        path = '%s_%s_users_top_%d.txt' % (self.project, self.language, amount)
+        handle = open(path, 'w')
+        handle.write(('%21s %18s %21s\n' % ('user name', 'translations', 'last update')).encode('utf-8'))
+        for user in user_names[:amount]:
+            handle.write(('%25s: %9d %32s\n' % (user, users[user]['count'], users[user]['last_update'])).encode('utf-8'))
+        handle.close()
+        print('Top %d user saved to "%s"' % (amount, path))
 
 
 if __name__ == '__main__':
