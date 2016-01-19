@@ -113,8 +113,33 @@ class TransifexStats(object):
             handle.close()
 
     def analyze(self):
-        # TODO: implement analyzing
-        pass
+        users = {}
+        for resource in self.resources:
+            for str in resource['strings']:
+                user = str['user']
+                last_update = str['last_update']
+                if not user:
+                    continue
+                if user not in users:
+                    users[user] = {
+                        'count': 0,
+                        'last_update': '1970-01-01T00:00:00.000'
+                    }
+                users[user]['count'] += 1
+                if last_update > users[user]['last_update']:
+                    users[user]['last_update'] = last_update
+        
+        def comparator(x, y):
+            if users[x]['count'] > users[y]['count']:
+                return -1
+            elif users[x]['count'] < users[y]['count']:
+                return 1
+            else:
+                return 0
+        user_names = sorted(users, comparator)
+        print('Top:')
+        for user in user_names[:20]:
+            print('%20s: %d translations, %s last update' % (user, users[user]['count'], users[user]['last_update']))
 
 
 if __name__ == '__main__':
