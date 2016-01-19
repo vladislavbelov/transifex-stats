@@ -35,14 +35,35 @@ import os
 import sys
 import time
 if sys.version_info[0] == 2:
-    import urllib2
+    from urllib2 import HTTPError
+    from urllib2 import Request
+    from urllib2 import urlopen
 elif sys.version_info[0] == 3:
-    # TODO: implement Python3 support
-    raise ImportError('Unsupported python version')
+    from urllib.error import HTTPError
+    from urllib.request import Request
+    from urllib.request import urlopen
 else:
     raise ImportError('Unsupported python version')
 
 UPDATE_TIME = 60 * 15
+
+
+class User(object):
+    def __init__(self, name):
+        self.name = name
+        self.count = 0
+        self.last_update = '1970-01-01T00:00:00.000'
+    
+    def add_translation(self, translation):
+        self.count += 1
+        if translation['last_update'] > self.last_update:
+            self.last_update = translation['last_update']
+    
+    def __lt__(self, other):
+        return self.count > other.count
+    
+    def __cmp__(self, other):
+        return self.count > other.count
 
 
 class TransifexStats(object):
@@ -65,7 +86,8 @@ class TransifexStats(object):
 
     def request(self, method):
         url = 'https://www.transifex.com/api/2' + method
-        base64string = base64.encodestring('%s:%s' % (self.username, self.password)).replace('\n', '')
+        auth = ('%s:%s' % (self.username, self.password)).encode('utf-8')
+        base64string = base64.b64encode(auth).decode('ascii')
         headers = {
             'Authorization': 'Basic %s' % base64string,
             'Content-Type': 'application/json',
@@ -73,11 +95,11 @@ class TransifexStats(object):
         }
         
         try:
-            request = urllib2.Request(url, None, headers)
-            handle = urllib2.urlopen(request)
+            request = Request(url, None, headers)
+            handle = urlopen(request)
             data = json.loads(handle.read().decode('utf-8'))
             handle.close()
-        except urllib2.HTTPError, error:
+        except HTTPError as error:
             if error.code == 401:
                 print('Authorization failed.')
                 exit()
@@ -117,34 +139,29 @@ class TransifexStats(object):
         for resource in self.resources:
             for str in resource['strings']:
                 user = str['user']
-                last_update = str['last_update']
                 if not user:
                     continue
                 if user not in users:
-                    users[user] = {
-                        'count': 0,
-                        'last_update': '1970-01-01T00:00:00.000'
-                    }
-                users[user]['count'] += 1
-                if last_update > users[user]['last_update']:
-                    users[user]['last_update'] = last_update
+                    users[user] = User(user)
+                users[user].add_translation({'last_update': str['last_update']})
         
-        def comparator(x, y):
-            if users[x]['count'] > users[y]['count']:
-                return -1
-            elif users[x]['count'] < users[y]['count']:
-                return 1
-            else:
-                return 0
-        user_names = sorted(users, comparator)
-        amount = 50
-        path = '%s_%s_users_top_%d.txt' % (self.project, self.language, amount)
+        users = sorted(users.values())
+        
+        top_limit = 50
+        
+        path = '%s_%s_users_top_%d.txt' % (self.project, self.language, top_limit)
         handle = open(path, 'w')
-        handle.write(('%21s %18s %21s\n' % ('user name', 'translations', 'last update')).encode('utf-8'))
-        for user in user_names[:amount]:
-            handle.write(('%25s: %9d %32s\n' % (user, users[user]['count'], users[user]['last_update'])).encode('utf-8'))
+        line = '%21s %18s %21s\n' % ('user name', 'translations', 'last update')
+        handle.write(line)
+        for user in users[:top_limit]:
+            line = '%25s: %9d %32s\n' % (user.name, user.count, user.last_update)
+            try:
+                handle.write(line)
+            except:
+                handle.write(line.encode('utf-8'))
         handle.close()
-        print('Top %d user saved to "%s"' % (amount, path))
+        
+        print('Top %d user saved to "%s"' % (top_limit, path))
 
 
 if __name__ == '__main__':
