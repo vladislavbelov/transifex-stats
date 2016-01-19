@@ -31,7 +31,9 @@ __version__ = '0.1.0'
 import base64
 import getpass
 import json
+import os
 import sys
+import time
 if sys.version_info[0] == 2:
     import urllib2
 elif sys.version_info[0] == 3:
@@ -39,6 +41,8 @@ elif sys.version_info[0] == 3:
     raise ImportError('Unsupported python version')
 else:
     raise ImportError('Unsupported python version')
+
+UPDATE_TIME = 60 * 15
 
 
 class TransifexStats(object):
@@ -76,13 +80,22 @@ class TransifexStats(object):
         except urllib2.HTTPError, error:
             if error.code == 401:
                 print('Authorization failed.')
-                sys.exit()
+                exit()
             else:
                 raise
         
         return data
 
     def download(self, cache=True):
+        path = '%s_resources_%s.json' % (self.project, self.language)
+        if cache and os.path.isfile(path):
+            if time.time() - os.path.getmtime(path) <= UPDATE_TIME:
+                self.log('Cache used.')
+                handle = open(path, 'r')
+                self.resources = json.load(handle)
+                handle.close()
+                return
+        
         self.log('Downloading resource list:')
         self.resources = self.request('/project/%s/resources/' % self.project)
         self.log(' Completed.')
@@ -95,12 +108,12 @@ class TransifexStats(object):
             self.log('  Completed.')
         
         if cache:
-            path = '%s_resources.json' % (self.project)
             handle = open(path, 'w')
-            handle.write(json.dumps(self.resources))
+            json.dump(self.resources, handle)
             handle.close()
 
     def analyze(self):
+        # TODO: implement analyzing
         pass
 
 
