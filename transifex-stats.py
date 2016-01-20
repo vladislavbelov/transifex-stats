@@ -48,6 +48,19 @@ else:
 UPDATE_TIME = 60 * 15
 
 
+class Translation(object):
+    def __init__(self, source_string, last_update, user):
+        self.source_string = source_string
+        self.last_update = last_update
+        self.user = user
+    
+    def __lt__(self, other):
+        return self.last_update > other.last_update
+    
+    def __cmp__(self, other):
+        return self.last_update > other.last_update
+
+
 class User(object):
     def __init__(self, name):
         self.name = name
@@ -141,6 +154,7 @@ class TransifexStats(object):
 
     def analyze(self):
         users = {}
+        translations = []
         for resource in self.resources:
             for str in resource['strings']:
                 user = str['user']
@@ -148,10 +162,14 @@ class TransifexStats(object):
                     continue
                 if user not in users:
                     users[user] = User(user)
+                translation = Translation(str['source_string'], str['last_update'], str['user'])
                 users[user].add_translation({'last_update': str['last_update']})
+                translations.append(translation)
         
         users = sorted(users.values())
+        translations = sorted(translations)
         
+        # top users
         top_limit = 50
         
         path = '%s_%s_users_top_%d.txt' % (self.project, self.language, top_limit)
@@ -166,7 +184,23 @@ class TransifexStats(object):
                 handle.write(line.encode('utf-8'))
         handle.close()
         
-        print('Top %d user saved to "%s"' % (top_limit, path))
+        print('Top %d user list saved to "%s"' % (top_limit, path))
+        
+        # last changes
+        
+        path = '%s_%s_last_changes.txt' % (self.project, self.language)
+        handle = open(path, 'w')
+        handle.write('Last changes\n\n')
+        for translation in translations[:100]:
+            line = '"%s": %s by %s\n' % (translation.source_string, translation.last_update, translation.user)
+            try:
+                handle.write(line)
+            except:
+                handle.write(line.encode('utf-8'))
+        handle.close()
+        
+        print('Last changes list saved to "%s"' % (path))
+        
 
 
 if __name__ == '__main__':
