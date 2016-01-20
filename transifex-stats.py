@@ -68,7 +68,7 @@ class User(object):
 
 class TransifexStats(object):
     
-    def __init__(self, project, username, password, language='en', quiet=False, logoutput=sys.stdout):
+    def __init__(self, project, username, language='en', password=None, quiet=False, logoutput=sys.stdout):
         # project authorization data
         self.project = project
         self.username = username
@@ -107,11 +107,16 @@ class TransifexStats(object):
                 raise
         
         return data
-
+    
+    def need_password(self, cache=True):
+        path = '%s_resources_%s.json' % (self.project, self.language)
+        if cache and os.path.isfile(path) and time.time() - os.path.getmtime(path) <= UPDATE_TIME:
+            return False
+        return True
+    
     def download(self, cache=True):
         path = '%s_resources_%s.json' % (self.project, self.language)
-        if cache and os.path.isfile(path):
-            if time.time() - os.path.getmtime(path) <= UPDATE_TIME:
+        if cache and os.path.isfile(path) and time.time() - os.path.getmtime(path) <= UPDATE_TIME:
                 self.log('Cache used.')
                 handle = open(path, 'r')
                 self.resources = json.load(handle)
@@ -200,13 +205,16 @@ if __name__ == '__main__':
             help()
             return
         
-        if not password:
-            password = getpass.getpass('Password: ')
+        stats = TransifexStats(project, username)
         
         if not language:
             language = raw_input('Language code: ')
+        stats.language = language
         
-        stats = TransifexStats(project, username, password, language)
+        if not password and stats.need_password():
+            password = getpass.getpass('Password: ')
+        stats.password = password
+        
         stats.download()
         stats.analyze()
     
