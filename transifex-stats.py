@@ -25,7 +25,7 @@
 
 __author__ = 'vladislavbelov'
 __license__ = 'MIT'
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 
 import base64
@@ -45,14 +45,17 @@ elif sys.version_info[0] == 3:
 else:
     raise ImportError('Unsupported python version')
 
+
+# cache expired in seconds
 UPDATE_TIME = 60 * 15
 
 
 class Translation(object):
-    def __init__(self, source_string, last_update, user):
+    def __init__(self, source_string, last_update, user, resource):
         self.source_string = source_string
         self.last_update = last_update
         self.user = user
+        self.resource = resource
     
     def __lt__(self, other):
         return self.last_update > other.last_update
@@ -130,11 +133,11 @@ class TransifexStats(object):
     def download(self, cache=True):
         path = '%s_resources_%s.json' % (self.project, self.language)
         if cache and os.path.isfile(path) and time.time() - os.path.getmtime(path) <= UPDATE_TIME:
-                self.log('Cache used.')
-                handle = open(path, 'r')
-                self.resources = json.load(handle)
-                handle.close()
-                return
+            self.log('Cache used.')
+            handle = open(path, 'r')
+            self.resources = json.load(handle)
+            handle.close()
+            return
         
         self.log('Downloading resource list:')
         self.resources = self.request('/project/%s/resources/' % self.project)
@@ -162,7 +165,7 @@ class TransifexStats(object):
                     continue
                 if user not in users:
                     users[user] = User(user)
-                translation = Translation(str['source_string'], str['last_update'], str['user'])
+                translation = Translation(str['source_string'], str['last_update'], str['user'], resource['name'])
                 users[user].add_translation({'last_update': str['last_update']})
                 translations.append(translation)
         
@@ -187,12 +190,13 @@ class TransifexStats(object):
         print('Top %d user list saved to "%s"' % (top_limit, path))
         
         # last changes
-        
+        changes_limit = 100
+
         path = '%s_%s_last_changes.txt' % (self.project, self.language)
         handle = open(path, 'w')
         handle.write('Last changes\n\n')
-        for translation in translations[:100]:
-            line = '"%s": %s by %s\n' % (translation.source_string, translation.last_update, translation.user)
+        for translation in translations[:changes_limit]:
+            line = '%s: "%s", %s by %s\n' % (translation.resource, translation.source_string, translation.last_update, translation.user)
             try:
                 handle.write(line)
             except:
