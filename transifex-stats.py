@@ -155,7 +155,7 @@ class TransifexStats(object):
             json.dump(self.resources, handle)
             handle.close()
 
-    def analyze(self):
+    def analyze(self, limits):
         users = {}
         translations = []
         for resource in self.resources:
@@ -174,6 +174,8 @@ class TransifexStats(object):
         
         # top users
         top_limit = 50
+        if 'top_limit' in limits:
+            top_limit = int(limits['top_limit'])
         
         path = '%s_%s_users_top_%d.txt' % (self.project, self.language, top_limit)
         handle = open(path, 'w')
@@ -191,6 +193,8 @@ class TransifexStats(object):
         
         # last changes
         changes_limit = 100
+        if 'changes_limit' in limits:
+            changes_limit = int(limits['changes_limit'])
 
         path = '%s_%s_last_changes.txt' % (self.project, self.language)
         handle = open(path, 'w')
@@ -203,17 +207,18 @@ class TransifexStats(object):
                 handle.write(line.encode('utf-8'))
         handle.close()
         
-        print('Last changes list saved to "%s"' % (path))
+        print('Last %d changes list saved to "%s"' % (changes_limit, path))
         
 
 
 if __name__ == '__main__':
     def help():
-        print('usage: transifex-stats -p project -u username [-p password -l language -q]')
+        print('usage: transifex-stats -p project -u username [-p password -l language -s top_limit=50]')
         print(' -i\tproject code')
         print(' -u\tusername of the account on the transifex')
         print(' -p\tpassword of the account on the transifex')
         print(' -l\tlanguage code of the project on the transifex')
+        print(' -s\tset limits (top_limit, changes_limit')
     
     def parse():
         if len(sys.argv) == 1:
@@ -224,6 +229,7 @@ if __name__ == '__main__':
         username = None
         password = None
         language = None
+        limits = {}
         
         for i in range(len(sys.argv)):
             key = sys.argv[i]
@@ -238,6 +244,9 @@ if __name__ == '__main__':
                 username = value
             elif key == '-l':
                 language = value
+            elif key == '-s':
+                pair = value.split('=')
+                limits[pair[0]] = pair[1]
         
         if not project or not username:
             help()
@@ -254,7 +263,7 @@ if __name__ == '__main__':
         stats.password = password
         
         stats.download()
-        stats.analyze()
+        stats.analyze(limits)
     
     parse()
     
