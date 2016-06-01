@@ -51,18 +51,34 @@ UPDATE_TIME = 60 * 15
 
 
 class Translation(object):
+    sort_by = None
     def __init__(self, source_string, last_update, user, resource):
         self.source_string = source_string
         self.last_update = last_update
         self.user = user
         self.resource = resource
-    
+
     def __lt__(self, other):
-        return self.last_update > other.last_update
+        return self.less(other)
     
     def __cmp__(self, other):
-        return self.last_update > other.last_update
-
+        return self.less(other)
+    
+    def less(self, other):
+        if Translation.sort_by is None:
+            return self.last_update > other.last_update
+        if Translation.sort_by == 'resource':
+            return self.resource < other.resource
+        elif Translation.sort_by == 'user':
+            return self.user < other.user
+        elif Translation.sort_by == 'source':
+            return self.source < other.source
+        else:
+            return self.last_update > other.last_update
+    
+    @staticmethod
+    def sort_by(group):
+        Translation.sort_by = group
 
 class User(object):
     def __init__(self, name):
@@ -155,7 +171,7 @@ class TransifexStats(object):
             json.dump(self.resources, handle)
             handle.close()
 
-    def analyze(self, limits):
+    def analyze(self, limits, group):
         users = {}
         translations = []
         for resource in self.resources:
@@ -169,6 +185,8 @@ class TransifexStats(object):
                 users[user].add_translation({'last_update': str['last_update']})
                 translations.append(translation)
         
+        if group:
+            Translation.sort_by(group)
         users = sorted(users.values())
         translations = sorted(translations)
         
@@ -218,6 +236,7 @@ if __name__ == '__main__':
         print(' -u\tusername of the account on the transifex')
         print(' -p\tpassword of the account on the transifex')
         print(' -l\tlanguage code of the project on the transifex')
+        print(' -g\tgroup changes by param (resource, user, source, date - default)')
         print(' -s\tset limits (top_limit, changes_limit')
     
     def parse():
@@ -230,6 +249,7 @@ if __name__ == '__main__':
         password = None
         language = None
         limits = {}
+        group = None
         
         for i in range(len(sys.argv)):
             key = sys.argv[i]
@@ -244,6 +264,8 @@ if __name__ == '__main__':
                 username = value
             elif key == '-l':
                 language = value
+            elif key == '-g':
+                group = value
             elif key == '-s':
                 pair = value.split('=')
                 limits[pair[0]] = pair[1]
@@ -263,7 +285,7 @@ if __name__ == '__main__':
         stats.password = password
         
         stats.download()
-        stats.analyze(limits)
+        stats.analyze(limits, group)
     
     parse()
     
